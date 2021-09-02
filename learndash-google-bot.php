@@ -93,65 +93,74 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          */
         private function hooks() {
 
-        	// 
-        	//add_action( 'init', array( $this, 'start_session' ), 1 );
-        	add_action( 'init', array( $this, 'google_visit_check' ), 5 );
+            // 
+            //add_action( 'init', array( $this, 'start_session' ), 1 );
+            add_action( 'init', array( $this, 'google_visit_check' ), 5 );
 
-        	// enable course content access if google bot is crawling
-        	add_filter( 'sfwd_lms_has_access', array( $this, 'filter_ld_user_access' ), 99, 3 );
-        	add_filter( 'learndash_get_course_price', array( $this, 'filter_course_price' ), 99 );
+            // enable course content access if google bot is crawling
+            add_filter( 'sfwd_lms_has_access', array( $this, 'filter_ld_user_access' ), 99, 3 );
+            add_filter( 'learndash_get_course_price', array( $this, 'filter_course_price' ), 99 );
 
-        	// user course progression hooks
-        	add_action( 'show_user_profile', array( $this, 'user_fields_callback' ) );
-        	add_action( 'edit_user_profile', array( $this, 'user_fields_callback' ) );
-	        add_action( 'personal_options_update', array( $this, 'save_user_profile_fields' ) );
-        	add_action( 'edit_user_profile_update', array( $this, 'save_user_profile_fields' ) );
-        	add_filter( 'learndash_course_progression_enabled', array( $this, 'filter_course_progression' ), 99, 2 );
+            // user course progression hooks
+            add_action( 'show_user_profile', array( $this, 'user_fields_callback' ) );
+            add_action( 'edit_user_profile', array( $this, 'user_fields_callback' ) );
+            add_action( 'personal_options_update', array( $this, 'save_user_profile_fields' ) );
+            add_action( 'edit_user_profile_update', array( $this, 'save_user_profile_fields' ) );
+            add_filter( 'learndash_course_progression_enabled', array( $this, 'filter_course_progression' ), 99, 2 );
 
             add_action( 'wp_footer', array( $this, 'footer_hook_callback' ) );
         }
 
         public function google_visit_check() {
 
-        	delete_expired_transients();
-        	
-        	if( strstr( strtolower( $_SERVER['HTTP_REFERER'] ), "google" ) ) {
+            delete_expired_transients();
+            
+            if( strstr( strtolower( $_SERVER['HTTP_REFERER'] ), "google" ) ) {
 
-				$is_google_visit = get_transient( 'ld_is_google_visit_' . self::$session_id );
+                $is_google_visit = get_transient( 'ld_is_google_visit_' . self::$session_id );
 
-				if( !$is_google_visit ) {
-					set_transient( 'ld_is_google_visit_' . self::$session_id, 'yes', 1 );
-				}
-				
-				// lets recall course access hooks
-				add_filter( 'sfwd_lms_has_access', array( $this, 'filter_ld_user_access' ), 10, 3 );
-        		add_filter( 'learndash_get_course_price', array( $this, 'filter_course_price' ), 10 );
+                if( !$is_google_visit ) {
+                    set_transient( 'ld_is_google_visit_' . self::$session_id, 'yes', 1 );
+                }
+                
+                // lets recall course access hooks
+                add_filter( 'sfwd_lms_has_access', array( $this, 'filter_ld_user_access' ), 10, 3 );
+                add_filter( 'learndash_get_course_price', array( $this, 'filter_course_price' ), 10 );
 
-        	}
+            }
         }
 
         /**
-		 * Filters whether a user has access to the course.
-		 *
-		 * @param boolean $has_access Whether the user has access to the course or not.
-		 * @param int     $post_id    Post ID.
-		 * @param int     $user_id    User ID.
+         * Filters whether a user has access to the course.
+         *
+         * @param boolean $has_access Whether the user has access to the course or not.
+         * @param int     $post_id    Post ID.
+         * @param int     $user_id    User ID.
          * 
          * @return boolearn $has_access Whether the user has access to the course or not.
-		 */
+         */
         public function filter_ld_user_access( $has_access, $post_id, $user_id ) {
 
-        	if( $this->is_google_bot() ) {
-        		$has_access = true;
-        	}
+            if( $this->is_google_bot() ) {
+                $has_access = true;
+            }
 
-        	
-        	$is_google_visit 	= get_transient( 'ld_is_google_visit_' . self::$session_id );
-			if( !empty( $is_google_visit ) ) {
-				$has_access = true;
-			}
-        	
-        	return $has_access;
+            
+            $is_google_visit    = get_transient( 'ld_is_google_visit_' . self::$session_id );
+            if( !empty( $is_google_visit ) ) {
+                $has_access = true;
+            }
+            
+            $user_id            = get_current_user_id();
+            $course_progression = get_user_meta( $user_id, 'course_progression', true );
+
+            if( $course_progression == 'yes' ) {
+                $has_access     = false;
+            } elseif( $course_progression == 'no' ) {
+                $has_access     = true;
+            }
+            
+            return $has_access;
         }
 
 
@@ -164,16 +173,16 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          */
         public function filter_course_price( $course_price ) {
 
-        	if( $this->is_google_bot() ) {
-        		$course_price['type'] = 'open';
-        	}
+            if( $this->is_google_bot() ) {
+                $course_price['type'] = 'open';
+            }
 
-        	$is_google_visit 	= get_transient( 'ld_is_google_visit_' . self::$session_id );
-			if( !empty( $is_google_visit ) ) {
-				$course_price['type'] = 'open';
-			}
+            $is_google_visit    = get_transient( 'ld_is_google_visit_' . self::$session_id );
+            if( !empty( $is_google_visit ) ) {
+                $course_price['type'] = 'open';
+            }
 
-        	return $course_price;
+            return $course_price;
         }
 
 
@@ -184,11 +193,11 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          */
         public function is_google_bot() {
 
-        	if( strstr( strtolower( $_SERVER['HTTP_USER_AGENT'] ), "googlebot" ) ) {
-        		return true;
-        	}
+            if( strstr( strtolower( $_SERVER['HTTP_USER_AGENT'] ), "googlebot" ) ) {
+                return true;
+            }
 
-        	return false;
+            return false;
         }
 
 
@@ -199,29 +208,53 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          */
         public function user_fields_callback( WP_User $user ) {
 
-        	$course_progression = get_user_meta( $user->ID, 'course_progression', true );
-			
-			?>
-			<h2><?php _e( 'Course Progression' ); ?></h2>
-			<table class="form-table">
-				<tr>
-					<th><label for="course_progression"><?php _e( 'Course Progression' ); ?></label></th>
-					<td>
-						<label>
-							<input type="radio" name="user_course_progression" <?php checked( $course_progression, 'yes' ) ?> value="yes">
-							<?php _e( 'Enable' ); ?>
-						</label>
-						&nbsp;
-						<label>
-							<input type="radio" name="user_course_progression" <?php checked( $course_progression, 'no' ) ?> value="no">
-							<?php _e( 'Disable' ); ?>
-						</label>
+			if( !current_user_can( 'manage_options' ) ) {
+				return;
+			}
 
-						<p class="description"><?php echo __('Enabel/disable course progression for all courses.'); ?></p>
-					</td>
-				</tr>
-			</table>
-			<?php
+			$user_courses = ld_course_list(array(
+				'array'		=>	true,
+				'user_id'	=>	$user->ID,
+				'mycourses'	=> 	'enrolled'
+			));
+			
+			if( empty($user_courses) ) {
+				return;
+			}
+
+            $course_progression = get_user_meta( $user->ID, 'course_progression', true );
+			
+            ?>
+            <h2><?php _e( 'Course Progression' ); ?></h2>
+            <table class="form-table">
+				<?php
+				foreach ($user_courses as $key => $course) {
+
+					$course_id 		= $course->ID;
+					$progression 	= isset( $course_progression[$course_id] ) ? $course_progression[$course_id] : "";
+
+					?>
+						<tr>
+							<th>
+								<?php echo get_the_title($course);?>
+							</th>
+							<td>
+								<label>
+									<input type="radio" name="user_progression[<?php echo $course_id; ?>]" <?php checked( $progression, 'yes' ); ?> value="yes">
+									<?php _e( 'Enable' ); ?>
+								</label>
+								&nbsp;
+								<label>
+									<input type="radio" name="user_progression[<?php echo $course_id; ?>]" <?php checked($progression, 'no' );?> value="no">
+									<?php _e( 'Disable' ); ?>
+								</label>
+							</td>
+						</tr>
+					<?php
+				}
+				?>
+            </table>
+            <?php
         }
 
 
@@ -231,11 +264,16 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          * @param      int  $user_id  The user ID
          */
         public function save_user_profile_fields( $user_id ) {
-        	if ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'update-user_' . $user_id ) ) {
-		        return;
-		    }
 
-		    update_user_meta( $user_id, 'course_progression', $_POST['user_course_progression'] );
+			if (!current_user_can('manage_options')) {
+				return;
+			}
+			
+            if ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'update-user_' . $user_id ) ) {
+                return;
+            }
+			
+            update_user_meta( $user_id, 'course_progression', $_POST['user_progression'] );
         }
 
 
@@ -250,16 +288,17 @@ if( !class_exists( 'LearnDash_Google_Bot' ) ) {
          */
         public function filter_course_progression( $progression, $course_id ) {
 
-        	$user_id  			= get_current_user_id();
-        	$course_progression = get_user_meta( $user_id, 'course_progression', true );
-
-        	if( $course_progression == 'yes' ) {
-        		$progression 	= true;
-        	} elseif( $course_progression == 'no' ) {
-        		$progression 	= false;
-        	}
-        	
-        	return $progression;
+            $user_id            		= get_current_user_id();
+            $user_course_progression 	= get_user_meta( $user_id, 'course_progression', true );
+			$course_progression 		= isset($user_course_progression[$course_id]) ? $user_course_progression[$course_id] : "";
+			
+            if( $course_progression == 'yes' ) {
+                $progression    = true;
+            } elseif( $course_progression == 'no' ) {
+                $progression    = false;
+            }
+            
+            return $progression;
         }
 
 
