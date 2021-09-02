@@ -16,7 +16,7 @@ if( !defined( 'ABSPATH' ) ) exit;
 
 if( !class_exists( 'LearnDash_Google_Bot' ) ) {
 
-    /**
+				/**
      * Main LearnDash_Google_Bot class
      *
      * @since       1.0.0
